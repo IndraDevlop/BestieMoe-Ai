@@ -16,7 +16,7 @@ Tech Stack
 Cara Menjalankan Secara Lokal
 1. Clone Repository
    ```bash
-   git clone [https://github.com/IndraDevlop/BestieMoe-Ai.git](https://github.com/IndraDevlop/BestieMoe-Ai.git)
+   git clone https://github.com/IndraDevlop/BestieMoe-Ai.git
    cd BestieMoe-Ai
 
 2. Install Dependensi
