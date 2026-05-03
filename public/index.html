@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Chatbot BestieMoe</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+      <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">Chatbot BestieMoe</h1>
+      <div id="chat-box" class="h-80 overflow-y-auto border border-gray-200 rounded-md p-4 mb-4 bg-gray-50 flex flex-col gap-2">
+      </div>
+      <div class="flex gap-2">
+        <input type="text" id="user-input" placeholder="Type your message..." 
+          class="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button onclick="sendMessage()" id="send-btn" 
+          class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition">Send</button>
+      </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        let conversation = [];
+
+        async function sendMessage() {
+          const text = userInput.value.trim();
+          if (!text) return;
+
+          appendMessage('user', text);
+          userInput.value = '';
+          conversation.push({ role: "user", text: text });
+
+          const typingId = showTypingIndicator();
+          userInput.disabled = true;
+          sendBtn.disabled = true;
+
+          try {
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ conversation })
+            });
+            if (!response.ok) throw new Error('Network response was not ok');
+            removeTypingIndicator(typingId);
+            const aiBubbleId = 'ai-' + Date.now();
+            appendMessage('model', '', aiBubbleId); 
+            const aiBubbleElement = document.getElementById(aiBubbleId);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            let fullAiText = "";      
+            let displayedText = "";   
+            let charIndex = 0;        
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              const chunk = decoder.decode(value, { stream: true });
+              fullAiText += chunk;
+
+              while (charIndex < fullAiText.length) {
+                displayedText += fullAiText[charIndex];
+                aiBubbleElement.innerText = displayedText;
+                charIndex++;
+                await sleep(15);
+                const isAtBottom = (chatBox.scrollHeight - chatBox.scrollTop) <= (chatBox.clientHeight + 50);
+
+                if (isAtBottom) {
+                  chatBox.scrollTo({ 
+                    top: chatBox.scrollHeight, 
+                    behavior: 'auto' 
+                  });
+                }
+              }
+            }
+
+            conversation.push({ role: "model", text: fullAiText });
+          } catch (error) {
+              removeTypingIndicator(typingId);
+              appendMessage('model', 'Mohon maaf, terjadi kendala pada sistem. Silakan coba kembali.');
+              console.error("Fetch Error:", error);
+          } finally {
+              userInput.disabled = false;
+              sendBtn.disabled = false;
+              userInput.focus();
+          }
+        }
+
+        function appendMessage(role, text, id = null) {
+          const div = document.createElement('div');
+          if (id) div.id = id;
+          
+          div.className = `p-3 rounded-lg max-w-[85%] mb-2 shadow-sm ${
+            role === 'user' 
+            ? 'bg-blue-500 text-white self-end rounded-tr-none' 
+            : 'bg-gray-200 text-gray-800 self-start rounded-tl-none'
+          }`;
+          div.innerText = text;
+          chatBox.appendChild(div);
+          chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        }
+
+        window.onload = () => {
+          appendMessage('model', "Halo bestieMoe. Senang sekali bisa ketemu kamu lagi hari ini. Aku siap jadi pendengar yang baik buat semua cerita kamu, atau kalau mau sekadar ngobrol seru juga boleh. Apa nih yang lagi ada di pikiran kamu?");
+        };
+
+        function showTypingIndicator() {
+          const id = 'typing-' + Date.now();
+          const div = document.createElement('div');
+          div.id = id;
+          div.className = 'bg-gray-200 text-gray-500 p-3 rounded-lg self-start rounded-tl-none mb-2 italic flex items-center gap-1';
+          div.innerHTML = `
+            <span>ChatBestieMoe sedang mengetik</span>
+            <span class="animate-bounce">.</span>
+            <span class="animate-bounce" style="animation-delay: 0.2s">.</span>
+            <span class="animate-bounce" style="animation-delay: 0.4s">.</span>
+          `;
+          chatBox.appendChild(div);
+          chatBox.scrollTop = chatBox.scrollHeight;
+          return id;
+        }
+
+        function removeTypingIndicator(id) {
+          const el = document.getElementById(id);
+          if (el) el.remove();
+        }
+
+        userInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") sendMessage();
+        });
+    </script>
+  </body>
+</html>
